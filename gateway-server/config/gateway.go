@@ -57,6 +57,7 @@ const (
 	GatewayProtocolModuleName  = "gateway.protocol.module_name"
 	GatewayProtocolVersion     = "gateway.protocol.version"
 	GatewayPatchChannel        = "gateway.patch.channel"
+	GatewayIgnoredOpcodes      = "gateway.ignored_opcodes"
 
 	// GatewayFarm* controls the documented farm section at the start of the
 	// shard-list response. Keeping it configurable avoids silently advertising
@@ -132,6 +133,7 @@ func bindEnvAliases() {
 	viper.BindEnv(GatewayProtocolModuleName, "GATEWAY_PROTOCOL_MODULE_NAME")
 	viper.BindEnv(GatewayProtocolVersion, "GATEWAY_PROTOCOL_VERSION")
 	viper.BindEnv(GatewayPatchChannel, "GATEWAY_PATCH_CHANNEL")
+	viper.BindEnv(GatewayIgnoredOpcodes, "GATEWAY_IGNORED_OPCODES")
 	viper.BindEnv(GatewayFarmID, "GATEWAY_FARM_ID")
 	viper.BindEnv(GatewayFarmName, "GATEWAY_FARM_NAME")
 }

@@ -613,6 +613,9 @@ func (w *WorldService) bootstrapGameServerRegionsContext(ctx context.Context, ga
 			if err := loader.LoadNavMeshInfos(); err != nil {
 				return fmt.Errorf("load raw navmesh metadata: %w", err)
 			}
+			if viper.GetBool(config.AgentTerrainPartitionOnly) {
+				loader.TerrainRegions = partition.regionSet()
+			}
 			if err := loader.LoadTerrainMeshes(nil); err != nil {
 				return fmt.Errorf("load raw navmesh terrain: %w", err)
 			}

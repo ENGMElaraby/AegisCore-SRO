@@ -23,6 +23,15 @@ type worldPartition struct {
 	regions []worldPartitionRegion
 }
 
+// regionSet returns the partition's region IDs for limiting what the navmesh loader decodes.
+func (p worldPartition) regionSet() map[int16]bool {
+	set := make(map[int16]bool, len(p.regions))
+	for _, region := range p.regions {
+		set[region.id] = true
+	}
+	return set
+}
+
 // validateWorldPartition converts the runtime-enabled database grouping into
 // a deterministic one-owner-per-region plan. The catalog query excludes
 // disabled dungeon planes; a negative ID reaching this boundary is therefore

@@ -118,14 +118,6 @@ func importReferenceData(ctx context.Context, arguments []string, output io.Writ
 	if err != nil {
 		return err
 	}
-	gameWorlds, err := loadGameWorldReferenceData(filepath.Join(textDataDirectory, "gameworlddata.txt"))
-	if err != nil {
-		return err
-	}
-	gameWorldRegions, err := loadDimensionHoleWorldRegionReferenceData(filepath.Join(textDataDirectory, "refregion.txt"))
-	if err != nil {
-		return err
-	}
 	eventRewards, eventRewardItems, err := loadEventRewardReferenceData(textDataDirectory)
 	if err != nil {
 		return err
@@ -141,10 +133,19 @@ func importReferenceData(ctx context.Context, arguments []string, output io.Writ
 	if err != nil {
 		return fmt.Errorf("configure Dimension Hole catalog repository: %w", err)
 	}
-	if _, err = dimensionHoleRepository.LoadDimensionHoleCatalog(ctx); err != nil {
+	dimensionHoles, err := dimensionHoleRepository.LoadDimensionHoleCatalog(ctx)
+	if err != nil {
 		return fmt.Errorf("load Dimension Hole catalog: %w", err)
 	}
-	startPositions := dimensionHoleStockStartPositions()
+	gameWorlds, err := loadGameWorldReferenceData(filepath.Join(textDataDirectory, "gameworlddata.txt"), dimensionHoles)
+	if err != nil {
+		return err
+	}
+	gameWorldRegions, err := loadDimensionHoleWorldRegionReferenceData(filepath.Join(textDataDirectory, "refregion.txt"), dimensionHoles)
+	if err != nil {
+		return err
+	}
+	startPositions := dimensionHoleStockStartPositions(dimensionHoles)
 	if err := importReferenceRows(ctx, pool, levels, skills, magicOptions, dropMagicAssignments, gameWorlds, gameWorldRegions, startPositions); err != nil {
 		return err
 	}
@@ -158,9 +159,9 @@ func importReferenceData(ctx context.Context, arguments []string, output io.Writ
 // dimensionHoleStockStartPositions is the exact vSRO 1.188
 // _RefInstance_World_Start_Pos subset for worlds 63-84. The stock server
 // selects uniformly from all rows for a world; this profile contains one each.
-func dimensionHoleStockStartPositions() []instanceWorldStartPositionReferenceRow {
-	rows := make([]instanceWorldStartPositionReferenceRow, 0, len(model.DimensionHoleCatalog()))
-	for _, definition := range model.DimensionHoleCatalog() {
+func dimensionHoleStockStartPositions(definitions []model.DimensionHoleDefinition) []instanceWorldStartPositionReferenceRow {
+	rows := make([]instanceWorldStartPositionReferenceRow, 0, len(definitions))
+	for _, definition := range definitions {
 		row := instanceWorldStartPositionReferenceRow{WorldID: definition.WorldID}
 		switch definition.WorldID {
 		case 63, 64, 65, 66, 67, 68:
@@ -177,10 +178,15 @@ func dimensionHoleStockStartPositions() []instanceWorldStartPositionReferenceRow
 	return rows
 }
 
-func loadGameWorldReferenceData(path string) ([]gameWorldReferenceRow, error) {
+// loadGameWorldReferenceData parses gameworlddata.txt and adds the stock lifecycle values to the given Dimension Hole worlds.
+func loadGameWorldReferenceData(path string, dimensionHoles []model.DimensionHoleDefinition) ([]gameWorldReferenceRow, error) {
 	contents, err := readClientTextFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("open game-world data %q: %w", path, err)
+	}
+	dimensionHoleWorlds := make(map[uint64]bool, len(dimensionHoles))
+	for _, definition := range dimensionHoles {
+		dimensionHoleWorlds[uint64(definition.WorldID)] = true
 	}
 	var rows []gameWorldReferenceRow
 	seenIDs := make(map[uint64]bool)
@@ -203,14 +209,12 @@ func loadGameWorldReferenceData(path string) ([]gameWorldReferenceRow, error) {
 		}
 		seenIDs[worldID], seenCodes[fields[1]] = true, true
 		row := gameWorldReferenceRow{WorldID: worldID, CodeName: fields[1], WorldType: worldType, MaxInstanceCount: maxInstances, MaxUserCount: maxUsers, ConfigGroupCodeName: fields[5]}
-		if worldID <= uint64(^uint16(0)) {
-			if _, dimensionHole := model.DimensionHoleDefinitionForWorld(uint16(worldID)); dimensionHole {
-				row.WorldEntryType = uint64(model.DimensionHoleWorldEntryType)
-				row.WorldEntranceType = uint64(model.DimensionHoleWorldEntranceType)
-				row.WorldLeaveType = uint64(model.DimensionHoleWorldLeaveType)
-				row.WorldDurationMS = uint64(model.DimensionHoleWorldDurationMS)
-				row.WorldEmptyRemainMS = uint64(model.DimensionHoleWorldEmptyRemainMS)
-			}
+		if dimensionHoleWorlds[worldID] {
+			row.WorldEntryType = uint64(model.DimensionHoleWorldEntryType)
+			row.WorldEntranceType = uint64(model.DimensionHoleWorldEntranceType)
+			row.WorldLeaveType = uint64(model.DimensionHoleWorldLeaveType)
+			row.WorldDurationMS = uint64(model.DimensionHoleWorldDurationMS)
+			row.WorldEmptyRemainMS = uint64(model.DimensionHoleWorldEmptyRemainMS)
 		}
 		rows = append(rows, row)
 	}
@@ -223,7 +227,11 @@ func loadGameWorldReferenceData(path string) ([]gameWorldReferenceRow, error) {
 	return rows, nil
 }
 
-func loadDimensionHoleWorldRegionReferenceData(path string) ([]gameWorldRegionReferenceRow, error) {
+// loadDimensionHoleWorldRegionReferenceData expands refregion.txt's Dimension Hole families into rows for the given worlds.
+func loadDimensionHoleWorldRegionReferenceData(path string, definitions []model.DimensionHoleDefinition) ([]gameWorldRegionReferenceRow, error) {
+	if len(definitions) == 0 {
+		return nil, errors.New("Dimension Hole catalog is empty; load it from the shard database first")
+	}
 	contents, err := readClientTextFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("open region data %q: %w", path, err)
@@ -279,7 +287,6 @@ func loadDimensionHoleWorldRegionReferenceData(path string) ([]gameWorldRegionRe
 		sort.Slice(regions[family], func(i, j int) bool { return regions[family][i] < regions[family][j] })
 	}
 
-	definitions := model.DimensionHoleCatalog()
 	capacity := 0
 	for _, definition := range definitions {
 		family, ok := dimensionHoleRegionFamily(definition.WorldCodeName)

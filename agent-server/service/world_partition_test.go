@@ -103,3 +103,13 @@ func TestAddRegionsNeverOverwritesExistingOwner(t *testing.T) {
 		t.Fatalf("existing owner was overwritten: owner=%q terrain=%p", world.regionOwners[7], world.regions[7])
 	}
 }
+
+func TestWorldPartitionRegionSetListsEveryRegion(t *testing.T) {
+	partition := worldPartition{regions: []worldPartitionRegion{{id: 25000, owner: "Jangan"}, {id: 24999, owner: "Jangan"}}}
+
+	set := partition.regionSet()
+
+	if len(set) != 2 || !set[25000] || !set[24999] {
+		t.Fatalf("regionSet() = %v, want regions 25000 and 24999", set)
+	}
+}

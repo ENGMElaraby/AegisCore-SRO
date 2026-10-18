@@ -12,7 +12,7 @@ import (
 )
 
 func TestDimensionHoleStockStartPositionsMatchPinnedSQLReference(t *testing.T) {
-	startPositions := dimensionHoleStockStartPositions()
+	startPositions := dimensionHoleStockStartPositions(model.DimensionHoleCatalog())
 	if got, want := len(startPositions), len(model.DimensionHoleCatalog()); got != want {
 		t.Fatalf("Dimension Hole start-position rows = %d, want %d", got, want)
 	}
@@ -59,7 +59,7 @@ func TestLoadReferenceDataFromLocalMedia(t *testing.T) {
 	if levels[0].JobActivityFactor != 24 || levels[0].JobExperience != [3]int64{70875, 70875, 70875} {
 		t.Fatalf("first level job fields = %+v", levels[0])
 	}
-	gameWorlds, err := loadGameWorldReferenceData(filepath.Join(textData, "gameworlddata.txt"))
+	gameWorlds, err := loadGameWorldReferenceData(filepath.Join(textData, "gameworlddata.txt"), model.DimensionHoleCatalog())
 	if err != nil {
 		t.Fatalf("loadGameWorldReferenceData() error = %v", err)
 	}
@@ -84,7 +84,7 @@ func TestLoadReferenceDataFromLocalMedia(t *testing.T) {
 			t.Fatalf("Dimension Hole world %d = %+v, want code=%s type=1 max-instances=50 capacity=%d group=%s", definition.WorldID, world, definition.WorldCodeName, definition.Capacity, wantGroup)
 		}
 	}
-	worldRegions, err := loadDimensionHoleWorldRegionReferenceData(filepath.Join(textData, "refregion.txt"))
+	worldRegions, err := loadDimensionHoleWorldRegionReferenceData(filepath.Join(textData, "refregion.txt"), model.DimensionHoleCatalog())
 	if err != nil {
 		t.Fatalf("loadDimensionHoleWorldRegionReferenceData() error = %v", err)
 	}
@@ -108,7 +108,7 @@ func TestLoadReferenceDataFromLocalMedia(t *testing.T) {
 			t.Fatalf("Dimension Hole world %d family %s regions = %d, want %d", definition.WorldID, family, got, want)
 		}
 	}
-	startPositions := dimensionHoleStockStartPositions()
+	startPositions := dimensionHoleStockStartPositions(model.DimensionHoleCatalog())
 	if got, want := len(startPositions), len(model.DimensionHoleCatalog()); got != want {
 		t.Fatalf("Dimension Hole start-position rows = %d, want %d", got, want)
 	}

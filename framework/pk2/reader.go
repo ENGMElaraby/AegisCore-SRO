@@ -103,6 +103,9 @@ func (r *Pk2Reader) ReadFile(filename string) ([]byte, error) {
 
 	entry, ok := r.Files[filename]
 	if !ok {
+		entry, ok = r.findFileIgnoringCase(filename)
+	}
+	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrArchiveFileNotFound, filename)
 	}
 	data, err := r.readEntryLocked(&entry)
@@ -234,6 +237,16 @@ func (r *Pk2Reader) decryptBuffer(buffer []byte) {
 		bufToDecrypt := buffer[i*8 : (i+1)*8]
 		r.cipher.DecryptRev(bufToDecrypt, bufToDecrypt)
 	}
+}
+
+// findFileIgnoringCase matches Joymax's case-insensitive archive paths. It runs only after an exact lookup misses.
+func (r *Pk2Reader) findFileIgnoringCase(filename string) (PackFileEntry, bool) {
+	for name, entry := range r.Files {
+		if strings.EqualFold(name, filename) {
+			return entry, true
+		}
+	}
+	return PackFileEntry{}, false
 }
 
 func (r *Pk2Reader) ReadEntry(entry *PackFileEntry) []byte {
