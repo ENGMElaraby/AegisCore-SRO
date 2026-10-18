@@ -65,6 +65,7 @@ prepared-cache validation does.
 | `AGENT_MODULE_ID` | `AgentServer` | Security module ID |
 | `AGENT_DATA_PATH` | `./Data` | Raw PK2 path; override to a file |
 | `AGENT_PRELINKED_NAVDATA_FILE` | `./prelinked_navdata.gob` | Prepared-cache prefix |
+| `AGENT_TERRAIN_PARTITION_ONLY` | `0` | Raw loading only: decode terrain for this Agent's `GAME_SERVER_REGION` partition only; edges out of it stay unlinked |
 | `AGENT_TRAFFIC_FILTER_PACKET_LIMIT` | `200` | Physical frames per window |
 | `AGENT_TRAFFIC_FILTER_WINDOW_MS` | `1000` | Traffic-filter window |
 | `AGENT_GIANT_MONSTER_SPAWN_RATIO` | `1000` | One-in-N giant generation ratio; `0` disables runtime giants |

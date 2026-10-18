@@ -5,6 +5,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/g3n/engine/math32"
 )
 
 func TestLoadTerrainMeshesIsOrderedAndRollsBackBothCaches(t *testing.T) {
@@ -174,4 +176,34 @@ func drainProgress(progress <-chan int) []int {
 		values = append(values, value)
 	}
 	return values
+}
+
+func TestLoadTerrainMeshesLoadsOnlyFilteredRegionsAndAllowsMissingNeighbours(t *testing.T) {
+	loader := &Loader{
+		NavMeshPath: "navmesh",
+		MapProjectInfo: MapProjectInfo{EnabledRegions: map[int16]bool{
+			2: true,
+			9: true,
+		}},
+		TerrainRegions: map[int16]bool{2: true},
+		ObjectData:     map[uint32]RtNavmeshObj{},
+	}
+	var decoded []int16
+
+	err := loader.loadTerrainMeshes(nil, func(staged *Loader, filepath string, regionID int16) error {
+		decoded = append(decoded, regionID)
+		terrain := NewRtNavmeshTerrain(filepath, NewRegionFromInt16(regionID))
+		terrain.Cells = []RtNavmeshCellQuad{{RtNavmeshCellBase: RtNavmeshCellBase{Index: 0}}}
+		line := LineSegment{A: math32.NewVector3(0, 0, 0), B: math32.NewVector3(1, 0, 0)}
+		terrain.GlobalEdges = []RtNavmeshEdgeGlobal{{RtNavmeshEdgeBase: RtNavmeshEdgeBase{Index: 0, Line: line}, SrcMeshIndex: int(regionID), DstMeshIndex: 9}}
+		staged.RegionData[regionID] = &terrain
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("loadTerrainMeshes() error = %v, want an edge into unloaded region 9 to be allowed", err)
+	}
+	if !reflect.DeepEqual(decoded, []int16{2}) || len(loader.RegionData) != 1 || loader.RegionData[2] == nil {
+		t.Fatalf("decoded %v, RegionData %v; want only region 2", decoded, loader.RegionData)
+	}
 }

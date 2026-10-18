@@ -35,6 +35,9 @@ type Loader struct {
 	// here avoids copying the large fixed-size tile/height arrays whenever a
 	// caller transfers or looks up a region.
 	RegionData map[int16]*RtNavmeshTerrain
+	// TerrainRegions, when set, limits terrain loading to these regions (e.g. one Agent's partition). Edges into
+	// regions left out are then not linked instead of failing validation.
+	TerrainRegions map[int16]bool
 }
 
 const (
@@ -205,7 +208,7 @@ func (l *Loader) loadTerrainMeshes(progress chan<- int, load func(*Loader, strin
 
 	regionIDs := make([]int16, 0, len(l.MapProjectInfo.EnabledRegions))
 	for regionID, enabled := range l.MapProjectInfo.EnabledRegions {
-		if !enabled {
+		if !enabled || (l.TerrainRegions != nil && !l.TerrainRegions[regionID]) {
 			continue
 		}
 		regionIDs = append(regionIDs, regionID)
@@ -231,7 +234,7 @@ func (l *Loader) loadTerrainMeshes(progress chan<- int, load func(*Loader, strin
 			progress <- completed
 		}
 	}
-	if err := linkTerrainEdges(staged.RegionData, true); err != nil {
+	if err := linkTerrainEdges(staged.RegionData, l.TerrainRegions == nil); err != nil {
 		return err
 	}
 

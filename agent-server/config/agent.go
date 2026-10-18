@@ -13,6 +13,7 @@ const (
 	AgentModuleId                  = "agent.module_id"
 	AgentDataPath                  = "agent.data_path"
 	AgentPrelinkedNavdataFile      = "agent.prelinked_navdata_file"
+	AgentTerrainPartitionOnly      = "agent.terrain_partition_only"
 	AgentTrafficPacketLimit        = "agent.traffic_filter.packet_limit"
 	AgentTrafficWindowMS           = "agent.traffic_filter.window_ms"
 	AgentTimedBuffDuration         = "agent.client.timed_buff_duration"
@@ -67,6 +68,7 @@ func bindEnvAliases() {
 	viper.BindEnv(AgentModuleId, "AGENT_MODULE_ID")
 	viper.BindEnv(AgentDataPath, "AGENT_DATA_PATH")
 	viper.BindEnv(AgentPrelinkedNavdataFile, "AGENT_PRELINKED_NAVDATA_FILE")
+	viper.BindEnv(AgentTerrainPartitionOnly, "AGENT_TERRAIN_PARTITION_ONLY")
 	viper.BindEnv(AgentTrafficPacketLimit, "AGENT_TRAFFIC_FILTER_PACKET_LIMIT")
 	viper.BindEnv(AgentTrafficWindowMS, "AGENT_TRAFFIC_FILTER_WINDOW_MS")
 	viper.BindEnv(AgentTimedBuffDuration, "AGENT_TIMED_BUFF_DURATION")
@@ -111,6 +113,7 @@ func setDefaultValues() {
 	viper.SetDefault(AgentModuleId, "AgentServer")
 	viper.SetDefault(AgentDataPath, "./Data")
 	viper.SetDefault(AgentPrelinkedNavdataFile, "./prelinked_navdata.gob")
+	viper.SetDefault(AgentTerrainPartitionOnly, false)
 	viper.SetDefault(AgentTrafficPacketLimit, 200)
 	viper.SetDefault(AgentTrafficWindowMS, 1000)
 	viper.SetDefault(AgentTimedBuffDuration, false)
