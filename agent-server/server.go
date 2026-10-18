@@ -115,6 +115,7 @@ type AgentServer struct {
 	ServerEventRewards     *service.ServerEventRewardRuntime
 	Competitive            *service.CompetitiveRuntime
 	Social                 *social.Handler
+	VFilter                *agentVFilter // nil when the VFilter panel integration is off
 	dependencyDrainMu      *sync.Mutex
 	//SpawnEngine             *spawn.SpawnEngine
 }
@@ -778,6 +779,14 @@ func NewAgentServer() (AgentServer, error) {
 		}
 	}
 
+	panelAccountPool, err := pools.Account()
+	if err != nil {
+		return AgentServer{}, fmt.Errorf("get Agent account pool for VFilter: %w", err)
+	}
+	if agentServer.VFilter, err = newAgentVFilter(world, &serv, agentServer.Lifecycle, panelAccountPool); err != nil {
+		return AgentServer{}, fmt.Errorf("configure VFilter panel integration: %w", err)
+	}
+
 	keepPools = true
 	return agentServer, nil
 }
@@ -865,6 +874,9 @@ func (a *AgentServer) Start() error {
 	}
 	if a.DependencyMonitor != nil {
 		a.DependencyMonitor.Start(a.packetContext)
+	}
+	if a.VFilter != nil {
+		a.VFilter.Start(a.packetContext)
 	}
 	if a.ServerEventRewards != nil {
 		a.ServerEventRewards.Start(a.packetContext)
@@ -1002,6 +1014,9 @@ func (a *AgentServer) Close(ctx context.Context) error {
 		if err := a.ServerEventRewards.Wait(ctx); err != nil {
 			closeErrors = append(closeErrors, fmt.Errorf("stop server event rewards: %w", err))
 		}
+	}
+	if a.VFilter != nil {
+		a.VFilter.Stop()
 	}
 	if err := a.closePools(); err != nil {
 		closeErrors = append(closeErrors, fmt.Errorf("close Agent database pools: %w", err))
