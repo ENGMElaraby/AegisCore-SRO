@@ -33,6 +33,7 @@ type GatewayServer struct {
 	Server               *server.Server
 	LoginHandler         *handler.LoginRequestHandler
 	Pools                *frameworkdb.Pools
+	VFilter              *gatewayVFilter // nil when the VFilter panel integration is off
 	packetContext        context.Context
 	cancelPacketHandling context.CancelFunc
 	startOnce            sync.Once
@@ -137,11 +138,19 @@ func NewGatewayServer() (GatewayServer, error) {
 	loginHandler.AdmissionEvaluator = handler.NewGatewayAdmissionEvaluator(admissionStore)
 	loginHandler.InstallTimeout = installTimeout
 	loginHandler.AttemptTracker = handler.NewLoginAttemptTracker(loginAttemptTrackerOptionsFromConfig())
+	panel, err := newGatewayVFilter(&s)
+	if err != nil {
+		return GatewayServer{}, fmt.Errorf("configure VFilter panel integration: %w", err)
+	}
+	if panel != nil {
+		loginHandler.PreAuthGate = panel.Gate
+	}
 	keepPools = true
 	return NewGatewayServerWithDependencies(GatewayDependencies{
 		Server:       &s,
 		LoginHandler: loginHandler,
 		Pools:        pools,
+		VFilter:      panel,
 	})
 }
 
@@ -186,6 +195,9 @@ func (g *GatewayServer) Start() {
 			}
 		}()
 		go g.handlePackets(g.packetContext)
+		if g.VFilter != nil {
+			g.VFilter.Start(g.packetContext)
+		}
 	})
 }
 
@@ -210,6 +222,9 @@ func (g *GatewayServer) Shutdown(ctx context.Context) error {
 	}
 	if g.cancelPacketHandling != nil {
 		g.cancelPacketHandling()
+	}
+	if g.VFilter != nil {
+		g.VFilter.Stop()
 	}
 	var listenerErr error
 	if g.Server != nil {

@@ -99,6 +99,9 @@ type LoginRequestHandler struct {
 	CredentialLookup   CredentialLookup
 	AdmissionEvaluator LoginAdmissionEvaluator
 	InstallTimeout     time.Duration
+	// PreAuthGate, when set, can refuse a login before any credential work (VFilter panel: gateway
+	// GM/inspection modes and blocked IPs). It must be fast and must not touch the password.
+	PreAuthGate func(username string, sourceIP netip.Addr) (LoginFailure, bool)
 }
 
 // NewLoginRequestHandler constructs the Gateway admission boundary with the
@@ -183,6 +186,12 @@ func (h *LoginRequestHandler) handlePacket(ctx context.Context, packet server.Pa
 		// tests or external construction that omitted the mandatory tracker.
 		tracker = NewLoginAttemptTracker(LoginAttemptTrackerOptions{})
 		h.AttemptTracker = tracker
+	}
+	if h.PreAuthGate != nil {
+		if failure, refused := h.PreAuthGate(username, sourceIP); refused {
+			h.sendLoginFailure(packet.Session, failure)
+			return
+		}
 	}
 	if failure, blocked := tracker.Preflight(username, sourceIP); blocked {
 		h.sendLoginFailure(packet.Session, failure)

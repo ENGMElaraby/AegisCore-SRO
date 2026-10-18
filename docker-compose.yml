@@ -82,7 +82,8 @@ services:
       context: .
       dockerfile: agent-server/Dockerfile
     image: aegiscore-agent-server:local
-    restart: always
+    # unless-stopped: a stop from the VFilter panel (vfilter-supervisor) must stick; crashes still restart.
+    restart: unless-stopped
     container_name: aegiscore-agent-server
     networks:
       - aegiscore
@@ -102,6 +103,8 @@ services:
           # Data.pk2 world loading settles above 5 GiB before any players join.
           memory: 8G
     environment:
+      # VFilter control panel (optional; empty = off). See _docs/vfilter-integration.md.
+      VFILTER_DSN: ${VFILTER_DSN:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DB_ACCOUNT_HOST: db
       DB_ACCOUNT_PW: "${MYSQL_PASSWORD:?Set MYSQL_PASSWORD to the sro database password}"
@@ -152,7 +155,8 @@ services:
       context: .
       dockerfile: gateway-server/Dockerfile
     image: aegiscore-gateway-server:local
-    restart: always
+    # unless-stopped: a stop from the VFilter panel (vfilter-supervisor) must stick; crashes still restart.
+    restart: unless-stopped
     container_name: aegiscore-gateway-server
     depends_on:
       db:
@@ -169,6 +173,8 @@ services:
       DB_SHARD_HOST: db
       DB_SHARD_PW: "${MYSQL_PASSWORD:?Set MYSQL_PASSWORD to the sro database password}"
       AGENT_HOST: agent-server
+      # VFilter control panel (optional; empty = off). See _docs/vfilter-integration.md.
+      VFILTER_DSN: ${VFILTER_DSN:-}
       SRO_SESSION_TRACE: ${GATEWAY_SESSION_TRACE:-0}
       SRO_SESSION_TRACE_DIR: /var/log/aegis/session-traces
       SRO_SESSION_TRACE_CAPACITY: ${SRO_SESSION_TRACE_CAPACITY:-256}
@@ -313,6 +319,24 @@ services:
       - "${SRO_PATCH_SOURCE_DIR:-./PatchSource}:/source:ro"
       - "${SRO_PATCH_SPEC_FILE:-./cmd/patch-admin/example-188-to-189.json}:/etc/aegiscore/spec.json:ro"
     working_dir: /etc/aegiscore
+
+  vfilter-supervisor:
+    # Carries out the VFilter panel's Start/Stop/Restart and reports stopped modules.
+    # The Docker socket is root-equivalent on the host: only enable this profile where the panel is trusted.
+    build:
+      context: .
+      dockerfile: cmd/vfilter-supervisor/Dockerfile
+    image: aegiscore-vfilter-supervisor:local
+    profiles: ["vfilter"]
+    restart: unless-stopped
+    container_name: aegiscore-vfilter-supervisor
+    networks:
+      - aegiscore
+    environment:
+      VFILTER_DSN: "${VFILTER_DSN:-}"
+      VFILTER_MODULE_CONTAINERS: "${VFILTER_MODULE_CONTAINERS:-Gateway=aegiscore-gateway-server,Agent1=aegiscore-agent-server}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 networks:
   aegiscore:

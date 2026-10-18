@@ -15,6 +15,7 @@ type GatewayDependencies struct {
 	Server       *server.Server
 	LoginHandler *handler.LoginRequestHandler
 	Pools        *frameworkdb.Pools
+	VFilter      *gatewayVFilter
 }
 
 // NewGatewayServerWithDependencies constructs the Gateway lifecycle facade
@@ -28,6 +29,7 @@ func NewGatewayServerWithDependencies(dependencies GatewayDependencies) (Gateway
 		Server:               dependencies.Server,
 		LoginHandler:         dependencies.LoginHandler,
 		Pools:                dependencies.Pools,
+		VFilter:              dependencies.VFilter,
 		packetContext:        packetContext,
 		cancelPacketHandling: cancelPacketHandling,
 	}, nil

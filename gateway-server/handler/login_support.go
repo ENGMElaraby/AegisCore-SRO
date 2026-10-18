@@ -43,6 +43,12 @@ func (h *LoginRequestHandler) handleLauncherTokenSessionPacket(ctx context.Conte
 		tracker = NewLoginAttemptTracker(LoginAttemptTrackerOptions{})
 		h.AttemptTracker = tracker
 	}
+	if h.PreAuthGate != nil {
+		if failure, refused := h.PreAuthGate(decoded.Username, sourceIP); refused {
+			h.sendLauncherTokenFailure(session, failure)
+			return nil
+		}
+	}
 	if failure, blocked := tracker.Preflight(decoded.Username, sourceIP); blocked {
 		h.sendLauncherTokenFailure(session, failure)
 		return nil
