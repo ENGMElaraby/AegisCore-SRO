@@ -60,7 +60,11 @@ type Config struct {
 	current  atomic.Pointer[Snapshot]
 	mu       sync.Mutex
 	versions map[string]int64
+	loaded   atomic.Bool
 }
+
+// Loaded reports whether the configuration has been read from the database at least once.
+func (c *Config) Loaded() bool { return c.loaded.Load() }
 
 // The areas AegisCore reads today; others (area_rules, cooldowns, ga_permissions) are added with their features.
 var usedAreas = []string{"settings", "lists", "modules"}
@@ -69,6 +73,13 @@ var usedAreas = []string{"settings", "lists", "modules"}
 func NewConfig(client *Client) *Config {
 	c := &Config{client: client, versions: map[string]int64{}}
 	c.current.Store(&Snapshot{Settings: map[string]string{}, Lists: map[string][]string{}})
+	return c
+}
+
+// NewConfigWithSnapshot returns a config fixed at s (tests of code that reads a snapshot).
+func NewConfigWithSnapshot(s *Snapshot) *Config {
+	c := NewConfig(nil)
+	c.current.Store(s)
 	return c
 }
 
@@ -101,6 +112,7 @@ func (c *Config) Refresh(ctx context.Context, force bool) ([]string, error) {
 		c.versions[area] = versions[area]
 	}
 	c.current.Store(&next)
+	c.loaded.Store(true)
 	return changed, nil
 }
 

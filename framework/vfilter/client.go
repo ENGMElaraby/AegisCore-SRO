@@ -8,9 +8,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	_ "github.com/microsoft/go-mssqldb"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -42,7 +44,31 @@ func Open(ctx context.Context, defaultModule string) (*Client, error) {
 		module = defaultModule
 	}
 
-	return OpenDSN(ctx, dsn, module)
+	// A server must not lose its VFILTER rules because SQL Server was down at boot: keep the pool (database/sql
+	// reconnects on its own) and let the pollers retry. Only an unusable DSN is fatal.
+	db, err := sql.Open("sqlserver", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open VFILTER database: invalid configuration")
+	}
+	db.SetMaxOpenConns(maxOpenConns)
+	pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
+	defer cancel()
+	if err := db.PingContext(pingCtx); err != nil {
+		log.WithError(err).Warn("VFILTER database not reachable yet; will keep retrying")
+	}
+	return &Client{db: db, Module: module}, nil
+}
+
+// BuildVersion is reported in filter_status.version: "aegiscore" plus the short VCS revision when known.
+func BuildVersion() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" && len(setting.Value) >= 7 {
+				return "aegiscore-" + setting.Value[:7]
+			}
+		}
+	}
+	return "aegiscore"
 }
 
 // OpenDSN connects with an explicit DSN (tests and the supervisor).
