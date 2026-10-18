@@ -1,6 +1,6 @@
 # VFILTER integration (website control panel → AegisCore)
 
-**Status:** in progress (branch `feat/vfilter-contract`) · **Date:** 2026-10-18
+**Status:** Phase 1 done (branch `feat/vfilter-contract`) · **Date:** 2026-10-18
 
 ## Why
 The VFilter control panel (repo `ENGMElaraby/VFilterWebsite`) configures and controls a Silkroad server through one
@@ -40,6 +40,14 @@ permanent. A permanent ban (`duration_minutes: null`) is applied.
 `gateway-server` and `agent-server` change from `restart: always` to `restart: unless-stopped`. A container stopped from the
 panel then stays stopped, even across a Docker daemon restart, until the panel starts it again. Crash restarts are unchanged.
 
+### Supervisor behaviour
+- Commands run one at a time. `stop`/`restart` wait up to 30 s per container, which is Docker's stop grace period, so a
+  queued command can wait behind a slow stop.
+- `all` starts the Agent before the Gateway, and stops the Gateway before the Agent, so players are never let in
+  with no Agent behind the Gateway.
+- A container that exited with 143 (SIGTERM) or 137 (SIGKILL after the grace period) was stopped on purpose. It shows
+  as `stopped`, unless Docker reports an out-of-memory kill. Any other non-zero exit shows as `error`, with the exit code.
+
 ### Security
 The supervisor mounts the Docker socket, which is root-equivalent on the host. It talks to nothing but SQL Server and Docker.
 It only acts on containers listed in its module map, and only for claimed contract commands. Credentials come from env
@@ -50,7 +58,25 @@ It only acts on containers listed in its module map, and only for claimed contra
 | --- | --- | --- |
 | `VFILTER_DSN` | all | e.g. `sqlserver://vfilter_svc:…@sqlhost:1433?database=VFILTER`. Empty = integration off |
 | `VFILTER_MODULE_NAME` | gateway, agent | Status row name. Defaults to `Gateway` / `Agent1` |
-| `VFILTER_MODULE_CONTAINERS` | supervisor | `Gateway=aegiscore-gateway-server-1,Agent1=aegiscore-agent-server-1` |
+| `VFILTER_MODULE_CONTAINERS` | supervisor | `Gateway=aegiscore-gateway-server,Agent1=aegiscore-agent-server` (compose default) |
+
+## Running it
+```bash
+export VFILTER_DSN='sqlserver://vfilter_svc:…@sqlhost:1433?database=VFILTER&encrypt=true'
+docker compose --profile vfilter up -d
+```
+Without `--profile vfilter` the supervisor does not run. The panel then shows Gateway/Agent status, but Start/Stop/Restart
+stay pending until they expire after 10 minutes.
+
+## Verification
+- `go test ./framework/vfilter/ ./cmd/vfilter-supervisor/ ./gateway-server/ ./agent-server/`. The SQL Server
+  integration tests run only when `VFILTER_TEST_DSN` is set (e.g. `sqlserver://sa:…@127.0.0.1:14333?encrypt=true&TrustServerCertificate=true`).
+  They create and drop a throwaway database.
+- Supervisor smoke test, 2026-10-18: two dummy containers and a local SQL Server.
+  - `stop all`: both containers stopped, and both status rows show `stopped`.
+  - `start agent1`: only the Agent started.
+  - `restart download` fails with "unknown target".
+  - `reload` is done.
 
 ## Phases
 1. **This branch:**

@@ -118,7 +118,7 @@ func (s *supervisor) downStatuses(ctx context.Context) []vfilter.Status {
 		case err != nil:
 			statuses = append(statuses, vfilter.Status{Module: m.Name, State: "error", LastError: err.Error()})
 		case state.Running:
-		case state.ExitCode != 0 && state.Status != "created":
+		case state.ExitCode != 0 && state.Status != "created" && !stoppedBySignal(state):
 			statuses = append(statuses, vfilter.Status{Module: m.Name, State: "error", LastError: fmt.Sprintf("container %s (exit code %d)", state.Status, state.ExitCode)})
 		default:
 			statuses = append(statuses, vfilter.Status{Module: m.Name, State: "stopped"})
@@ -126,6 +126,17 @@ func (s *supervisor) downStatuses(ctx context.Context) []vfilter.Status {
 	}
 	return statuses
 }
+
+// stoppedBySignal: docker stop sends SIGTERM (exit 143) and SIGKILL after the grace period (exit 137).
+// Those are deliberate stops, not failures, unless the kernel killed the process for memory.
+func stoppedBySignal(state containerState) bool {
+	return (state.ExitCode == exitSIGTERM || state.ExitCode == exitSIGKILL) && !state.OOMKilled
+}
+
+const (
+	exitSIGKILL = 128 + 9
+	exitSIGTERM = 128 + 15
+)
 
 func pastTense(verb string) string {
 	switch verb {

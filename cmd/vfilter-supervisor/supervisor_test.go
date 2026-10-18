@@ -13,6 +13,7 @@ type fakeDocker struct {
 	calls   []string
 	running map[string]bool
 	exit    map[string]int
+	oom     map[string]bool
 	fail    map[string]bool
 }
 
@@ -24,7 +25,7 @@ func (f *fakeDocker) inspect(_ context.Context, c string) (containerState, error
 	if f.running[c] {
 		status = "running"
 	}
-	return containerState{Running: f.running[c], Status: status, ExitCode: f.exit[c]}, nil
+	return containerState{Running: f.running[c], Status: status, ExitCode: f.exit[c], OOMKilled: f.oom[c]}, nil
 }
 
 func (f *fakeDocker) action(_ context.Context, c, verb string) (bool, error) {
@@ -38,7 +39,7 @@ func (f *fakeDocker) action(_ context.Context, c, verb string) (bool, error) {
 }
 
 func newTestSupervisor() (*supervisor, *fakeDocker) {
-	docker := &fakeDocker{running: map[string]bool{"gw": true, "ag": true}, exit: map[string]int{}, fail: map[string]bool{}}
+	docker := &fakeDocker{running: map[string]bool{"gw": true, "ag": true}, exit: map[string]int{}, fail: map[string]bool{}, oom: map[string]bool{}}
 	mods, _ := parseModules("Gateway=gw, Agent1=ag")
 	return &supervisor{modules: mods, docker: docker}, docker
 }
@@ -90,5 +91,20 @@ func TestDownStatusesSkipRunningModules(t *testing.T) {
 	docker.exit["ag"] = 0
 	if got := s.downStatuses(context.Background()); got[0].State != "stopped" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestDownStatusesTreatDockerStopSignalsAsStopped(t *testing.T) {
+	s, docker := newTestSupervisor()
+	docker.running["ag"] = false
+	for _, code := range []int{exitSIGTERM, exitSIGKILL} {
+		docker.exit["ag"] = code
+		if got := s.downStatuses(context.Background()); got[0].State != "stopped" {
+			t.Fatalf("exit %d: %+v", code, got)
+		}
+	}
+	docker.oom["ag"] = true
+	if got := s.downStatuses(context.Background()); got[0].State != "error" {
+		t.Fatalf("oom kill: %+v", got)
 	}
 }

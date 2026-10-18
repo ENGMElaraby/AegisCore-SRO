@@ -78,9 +78,10 @@ func nullString(value string) any {
 	return value
 }
 
-func nullSeconds(d time.Duration) any {
+// nullSeconds is typed as an integer even when NULL: SQL Server type-checks -@uptime in both CASE branches.
+func nullSeconds(d time.Duration) sql.NullInt64 {
 	if d <= 0 {
-		return nil
+		return sql.NullInt64{}
 	}
-	return int(d / time.Second)
+	return sql.NullInt64{Int64: int64(d / time.Second), Valid: true}
 }

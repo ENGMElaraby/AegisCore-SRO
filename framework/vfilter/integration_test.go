@@ -160,6 +160,15 @@ func TestStatusSessionsAndLogs(t *testing.T) {
 	if state != "running" || up < 89 || up > 91 {
 		t.Fatalf("status %s %d", state, up)
 	}
+	// Uptime 0 stores NULL started_at; regression for "nvarchar is invalid for minus operator".
+	if err := c.WriteStatus(ctx, Status{Module: "Agent1", State: "stopped"}); err != nil {
+		t.Fatal(err)
+	}
+	var startedNull int
+	_ = c.db.QueryRow("SELECT state, CASE WHEN started_at IS NULL THEN 1 ELSE 0 END FROM filter_status WHERE module='Agent1'").Scan(&state, &startedNull)
+	if state != "stopped" || startedNull != 1 {
+		t.Fatalf("stopped status %s started_null=%d", state, startedNull)
+	}
 
 	mirror := NewSessionMirror(c)
 	runCtx, cancel := context.WithCancel(ctx)

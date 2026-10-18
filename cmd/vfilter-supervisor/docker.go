@@ -30,10 +30,11 @@ func newDockerClient(socket string) *dockerClient {
 }
 
 type containerState struct {
-	Running  bool   `json:"Running"`
-	Status   string `json:"Status"`
-	ExitCode int    `json:"ExitCode"`
-	Error    string `json:"Error"`
+	Running   bool   `json:"Running"`
+	Status    string `json:"Status"`
+	ExitCode  int    `json:"ExitCode"`
+	OOMKilled bool   `json:"OOMKilled"`
+	Error     string `json:"Error"`
 }
 
 func (d *dockerClient) inspect(ctx context.Context, container string) (containerState, error) {
