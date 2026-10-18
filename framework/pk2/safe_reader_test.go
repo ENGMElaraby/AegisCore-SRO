@@ -210,3 +210,26 @@ func writeSyntheticPK2(t *testing.T, mutate func(block []byte, fileSize uint64))
 	}
 	return path
 }
+
+// Joymax archives are case-insensitive: the client and stock servers find "Data/dungeon/Dungeoninfo.txt" stored as
+// "Data/Dungeon/dungeoninfo.txt". An exact match still wins.
+func TestSafePk2ReaderReadsFileIgnoringCase(t *testing.T) {
+	path := writeSyntheticPK2(t, nil)
+	reader, err := OpenPk2Reader(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	if err := reader.IndexArchiveSafe(); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := reader.ReadFile("FIXTURE" + string(os.PathSeparator) + "Hello.TXT")
+
+	if err != nil {
+		t.Fatalf("ReadFile() with different case error = %v", err)
+	}
+	if !bytes.Equal(data, []byte("safe pk2 payload")) {
+		t.Fatalf("unexpected payload %q", data)
+	}
+}
