@@ -129,7 +129,13 @@ func NewGatewayServer() (GatewayServer, error) {
 		protocolregistry.GatewayPreLogin,
 	)
 	gatewayOpcodes = append(gatewayOpcodes, opcode.LauncherTokenRequest)
+	ignoredOpcodes, err := handler.ParseIgnoredOpcodes(viper.GetString(config.GatewayIgnoredOpcodes))
+	if err != nil {
+		return GatewayServer{}, fmt.Errorf("configure ignored client opcodes: %w", err)
+	}
+	gatewayOpcodes = append(gatewayOpcodes, ignoredOpcodes...)
 	s.SetAdmissionPolicy(server.AllowListedAdmissionPolicy(gatewayOpcodes...))
+	handler.RegisterIgnoredOpcodeHandlers(&s, ignoredOpcodes)
 	handler.RegisterPatchRequestHandlerWithCatalog(&s, patches, viper.GetString(config.GatewayPatchChannel))
 	handler.RegisterShardlistRequestHandlerWithReadiness(&s, shards, installer)
 	handler.RegisterShardlistPingHandler(&s)
